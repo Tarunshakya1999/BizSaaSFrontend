@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useBusiness } from './Businesscontext';
 import { useAuth } from './Authcontext';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from './api';
-import { Plus, Search, Edit2, Trash2, Phone, User, X, CheckCircle, XCircle, MessageCircle, QrCode } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Phone, User, X, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
 
 function Modal({ title, onClose, children }) {
   return (
@@ -91,83 +91,6 @@ function CustomerForm({ initial, onSave, onClose, businessId }) {
   );
 }
 
-// Function to open UPI app directly with pre-filled amount
-function openUpiApp(upiId, businessName, amount, customerName, planName) {
-  if (!upiId) {
-    alert('Business ka UPI ID set nahi hai. Pehle Settings mein UPI ID add karo.');
-    return false;
-  }
-  
-  // Clean UPI ID (remove any spaces)
-  const cleanUpiId = upiId.trim();
-  
-  // Create UPI payment link with amount and details
-  const upiLink = `upi://pay?pa=${cleanUpiId}&pn=${encodeURIComponent(businessName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`${planName} renewal for ${customerName}`)}`;
-  
-  // Detect if on mobile
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  
-  if (isMobile) {
-    // On mobile - try to open UPI app directly
-    window.location.href = upiLink;
-    
-    // Fallback if UPI app doesn't open
-    setTimeout(() => {
-      const fallbackLink = `https://www.google.com/search?q=${encodeURIComponent(cleanUpiId)}`;
-      const userChoice = confirm('UPI app could not be opened. Do you want to search for this UPI ID on Google?\n\nClick OK to search, Cancel to copy UPI ID.');
-      if (userChoice) {
-        window.open(fallbackLink, '_blank');
-      } else {
-        navigator.clipboard.writeText(cleanUpiId);
-        alert(`UPI ID copied: ${cleanUpiId}\n\nAap manually UPI app mein pay kar sakte hain.`);
-      }
-    }, 2000);
-  } else {
-    // On desktop - show UPI ID and QR option
-    const desktopChoice = confirm(`Desktop par UPI payment ke liye:\n\n1. Scan QR code from mobile\n2. Or copy UPI ID: ${cleanUpiId}\n\nClick OK to copy UPI ID`);
-    if (desktopChoice) {
-      navigator.clipboard.writeText(cleanUpiId);
-      alert(`UPI ID copied: ${cleanUpiId}`);
-    }
-  }
-  
-  return true;
-}
-
-// Function to open WhatsApp with payment link
-function openWhatsApp(phoneNumber, message) {
-  const cleanNumber = phoneNumber.replace(/\D/g, '');
-  const waNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
-  
-  try {
-    if (isMobile) {
-      const mobileLink = `whatsapp://send?phone=${waNumber}&text=${encodeURIComponent(message)}`;
-      window.location.href = mobileLink;
-      
-      setTimeout(() => {
-        window.open(waLink, '_blank');
-      }, 2000);
-    } else {
-      const desktopLink = `https://web.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(message)}`;
-      const newWindow = window.open(desktopLink, '_blank');
-      
-      if (!newWindow || newWindow.closed) {
-        const tempLink = document.createElement('a');
-        tempLink.href = desktopLink;
-        tempLink.target = '_blank';
-        document.body.appendChild(tempLink);
-        tempLink.click();
-        document.body.removeChild(tempLink);
-      }
-    }
-  } catch (error) {
-    console.error('WhatsApp error:', error);
-    alert(`WhatsApp link: ${waLink}\n\nAap manually WhatsApp mein message bhej sakte hain.`);
-  }
-}
-
 export default function Customers() {
   const { activeBusiness } = useBusiness();
   const { user } = useAuth();
@@ -192,7 +115,7 @@ export default function Customers() {
     fetchCustomers();
   };
 
-  // Handle WhatsApp reminder with payment link and auto UPI
+  // WhatsApp reminder message with business owner info + UPI payment link
   const handleWhatsAppReminder = (customer) => {
     if (!customer.phone) {
       alert('Is customer ka phone number nahi hai. Edit karke add karo.');
@@ -203,84 +126,34 @@ export default function Customers() {
     const businessType = activeBusiness?.type || '';
     const ownerName = user?.first_name || user?.username || 'Owner';
     const upiId = activeBusiness?.upi_id || '';
-    
-    // Get subscription details
+
+    // Active subscription check
     const sub = customer.active_subscription;
     const planName = sub?.plan_name || 'Subscription';
-    const planAmount = sub?.plan_amount || 0;
     const daysLeft = sub?.days_remaining;
     const endDate = sub?.end_date;
-    
-    // Format date nicely
-    const formattedEndDate = endDate ? new Date(endDate).toLocaleDateString('en-IN') : 'N/A';
 
-    // Create UPI payment link with amount
-    const upiPayLink = upiId ? 
-      `upi://pay?pa=${upiId}&pn=${encodeURIComponent(businessName)}&am=${planAmount}&cu=INR&tn=${encodeURIComponent(`${planName} renewal - ${customer.name}`)}` : '';
+    // UPI payment link (amount auto-fill)
+    const upiLink = upiId
+      ? `upi://pay?pa=${upiId}&pn=${encodeURIComponent(businessName)}&cu=INR&tn=${encodeURIComponent(`${planName} renewal`)}`
+      : '';
 
-    // Create the WhatsApp message
-    const whatsappMsg = 
-`*PAYMENT REMINDER* 🏢
+    const msg =
+      `Namaste ${customer.name} ji! 🙏\n\n` +
+      `Aapko ${businessName} (${businessType}) ki taraf se payment reminder bheja ja raha hai.\n\n` +
+      `📋 Plan: ${planName}\n` +
+      (endDate ? `📅 Expiry Date: ${endDate}\n` : '') +
+      (daysLeft !== undefined ? `⏰ Bacha hua samay: ${daysLeft} din\n` : '') +
+      `\nKripya payment jald karein taaki aapki service uninterrupted rahe.\n\n` +
+      (upiId
+        ? `💳 UPI Payment:\nUPI ID: ${upiId}\n${upiLink ? `👉 Pay Here: ${upiLink}\n` : ''}\n`
+        : '') +
+      `📞 Contact: ${ownerName}\n\n` +
+      `Thank you! 😊`;
 
-Namaste ${customer.name} ji! 🙏
-
-Aapko *${businessName}* (${businessType}) ki taraf se payment reminder bheja ja raha hai.
-
-━━━━━━━━━━━━━━━━━━━━
-📋 *Subscription Details*
-━━━━━━━━━━━━━━━━━━━━
-📦 Plan: ${planName}
-💰 Amount: ₹${planAmount}
-📅 Expiry Date: ${formattedEndDate}
-⏰ Days Left: ${daysLeft} din
-
-━━━━━━━━━━━━━━━━━━━━
-💳 *Payment Options*
-━━━━━━━━━━━━━━━━━━━━
-
-*Option 1: Direct UPI Payment* ✅
-👉 Click this link to pay: ${upiPayLink}
-
-*Option 2: Manual UPI Transfer*
-UPI ID: ${upiId || 'Not set'}
-
-*Option 3: Scan QR Code* 📱
-(QR code attached in next message)
-
-━━━━━━━━━━━━━━━━━━━━
-📞 *Need Help?*
-━━━━━━━━━━━━━━━━━━━━
-Contact: ${ownerName}
-Business: ${businessName}
-
-⚠️ *Please complete payment before expiry to avoid service interruption.*
-
-Thank you for your business! 😊`;
-
-    // Clean phone number and send WhatsApp message
-    const phone = customer.phone.replace(/\D/g, '');
-    openWhatsApp(phone, whatsappMsg);
-  };
-
-  // Handle direct payment button (opens UPI app)
-  const handleDirectPayment = (customer) => {
-    if (!customer.active_subscription) {
-      alert('Is customer ka koi active plan nahi hai. Pehle plan assign karo.');
-      return;
-    }
-    
-    const upiId = activeBusiness?.upi_id;
-    if (!upiId) {
-      alert('Business ka UPI ID set nahi hai. Settings mein jakar UPI ID add karo.');
-      return;
-    }
-    
-    const businessName = activeBusiness?.name || 'Business';
-    const planAmount = customer.active_subscription?.plan_amount || 0;
-    const planName = customer.active_subscription?.plan_name || 'Subscription';
-    const customerName = customer.name;
-    
-    openUpiApp(upiId, businessName, planAmount, customerName, planName);
+    const phone = customer.phone.replace(/\D/g, ''); // sirf digits
+    const waPhone = phone.startsWith('91') ? phone : `91${phone}`;
+    window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   const statusBadge = (sub) => {
@@ -354,27 +227,13 @@ Thank you for your business! 😊`;
                       {statusBadge(c.active_subscription)}
                     </div>
                     {c.active_subscription && (
-                      <p className="text-gray-600 text-xs mt-1">
-                        {c.active_subscription.plan_name} - ₹{c.active_subscription.plan_amount}
-                      </p>
+                      <p className="text-gray-600 text-xs mt-1">{c.active_subscription.plan_name}</p>
                     )}
                   </div>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-2 flex-shrink-0">
-                  {/* Direct Payment Button - Opens UPI App */}
-                  {c.active_subscription && c.active_subscription.status === 'active' && (
-                    <button
-                      onClick={() => handleDirectPayment(c)}
-                      className="flex items-center gap-1.5 text-xs bg-indigo-800/60 hover:bg-indigo-700 text-indigo-300 px-3 py-1.5 rounded-lg transition"
-                      title="Direct UPI Payment"
-                    >
-                      <QrCode className="w-3 h-3" />
-                      Pay Now
-                    </button>
-                  )}
-                  
                   {/* WhatsApp Reminder Button */}
                   <button
                     onClick={() => handleWhatsAppReminder(c)}
