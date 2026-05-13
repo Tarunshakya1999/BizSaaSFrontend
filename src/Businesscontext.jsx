@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { getBusinesses } from './api';
-import { useAuth } from './AuthContext';
+import { useAuth } from './Authcontext';
 
 const BusinessContext = createContext(null);
 
