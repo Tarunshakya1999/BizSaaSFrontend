@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider , useAuth } from './Authcontext';
-import { BusinessProvider } from './BusinessContext';
+import { BusinessProvider } from './Businesscontext';
 import Layout from './Layout';
 import Login from './Login';
 import Register from './Register';
