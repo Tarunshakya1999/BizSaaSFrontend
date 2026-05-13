@@ -4,7 +4,7 @@ import { BusinessProvider } from './BusinessContext';
 import Layout from './Layout';
 import Login from './Login';
 import Register from './Register';
-import Dashboard from './Dashboard ';
+import Dashboard from './Dashboard';
 import Customers from './Customers';
 import Subscriptions from './Subscriptions';
 import Payments from './Payments';
