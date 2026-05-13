@@ -3,7 +3,7 @@ import { getSaaSPlans } from './api';
 import { X, Crown, QrCode, MessageCircle, Clock, AlertTriangle, Shield } from 'lucide-react';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const YOUR_WHATSAPP = '919971866919';
+const YOUR_WHATSAPP = '919971866919'; // Fixed: removed + symbol
 const YOUR_UPI_ID = 'shakyatarun32-3@okicici';
 const YOUR_NAME = 'BizTrack Support';
 
@@ -16,7 +16,7 @@ function makeUpiLink(amount, note) {
 function makeWhatsAppMsg(user, plan) {
   const msg = `Namaste! Main BizTrack ka subscription lena chahta/chahti hoon.
 
-👤 Name: ${user?.first_name || user?.username}
+👤 Name: ${user?.first_name || user?.username || 'Guest'}
 📧 Email: ${user?.email || '-'}
 📦 Plan: ${plan?.name} (${plan?.plan_type === 'monthly' ? 'Monthly' : 'Yearly'})
 💰 Amount: ₹${plan?.price}
@@ -34,6 +34,79 @@ Payment karne ke baad:
 
 Thank you! 🙏`;
   return encodeURIComponent(msg);
+}
+
+// Function to open WhatsApp with proper error handling
+function openWhatsApp(phoneNumber, message, isMobileDevice = null) {
+  // Clean phone number - remove any non-numeric characters
+  const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+  
+  // Ensure number starts with country code (91 for India)
+  const waNumber = cleanNumber.startsWith('91') ? cleanNumber : `91${cleanNumber}`;
+  
+  // Detect if user is on mobile if not specified
+  const isMobile = isMobileDevice !== null ? isMobileDevice : /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  // Create the WhatsApp link
+  const waLink = `https://wa.me/${waNumber}?text=${message}`;
+  
+  try {
+    if (isMobile) {
+      // For mobile: try to use whatsapp:// protocol first to open the app
+      const mobileLink = `whatsapp://send?phone=${waNumber}&text=${message}`;
+      
+      // Try to open WhatsApp app
+      window.location.href = mobileLink;
+      
+      // Fallback to web version after 2.5 seconds if app didn't open
+      setTimeout(() => {
+        // Check if we're still on the same page (app didn't open)
+        const newWindow = window.open(waLink, '_blank');
+        if (!newWindow || newWindow.closed) {
+          // Show user a helpful message
+          const userChoice = confirm('WhatsApp app could not be opened. Do you want to use WhatsApp Web instead?\n\nClick OK for WhatsApp Web, Cancel to copy the link.');
+          if (userChoice) {
+            window.open(waLink, '_blank');
+          } else {
+            navigator.clipboard.writeText(waLink);
+            alert('Link copied to clipboard! You can paste it in your browser.');
+          }
+        }
+      }, 2500);
+    } else {
+      // For desktop: use web.whatsapp.com
+      const desktopLink = `https://web.whatsapp.com/send?phone=${waNumber}&text=${message}`;
+      const newWindow = window.open(desktopLink, '_blank');
+      
+      // If popup is blocked, try alternative method
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // Create a temporary anchor element
+        const tempLink = document.createElement('a');
+        tempLink.href = desktopLink;
+        tempLink.target = '_blank';
+        tempLink.rel = 'noopener noreferrer';
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        document.body.removeChild(tempLink);
+        
+        // If still not working, show the link to user
+        setTimeout(() => {
+          const stillBlocked = confirm('Popup was blocked. Do you want to open WhatsApp Web in current tab?\n\nClick OK to proceed, Cancel to copy the link.');
+          if (stillBlocked) {
+            window.location.href = desktopLink;
+          } else {
+            navigator.clipboard.writeText(desktopLink);
+            alert('Link copied to clipboard! You can paste it in your browser.');
+          }
+        }, 100);
+      }
+    }
+  } catch (error) {
+    console.error('WhatsApp open error:', error);
+    // Last resort - show the link to user
+    const fallbackLink = `https://wa.me/${waNumber}?text=${message}`;
+    alert(`WhatsApp could not be opened automatically.\n\nPlease click this link manually:\n${fallbackLink}\n\nOr send message to: ${phoneNumber}`);
+  }
 }
 
 // ─── QR CODE (simple UPI QR using qr-server API) ─────────────────────────────
@@ -57,11 +130,17 @@ function SubscribeModal({ onClose, user }) {
   const [plans, setPlans] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    // Detect mobile device
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    
     getSaaSPlans().then((r) => {
       setPlans(r.data);
       setSelected(r.data[0] || null);
+    }).catch((error) => {
+      console.error('Failed to load plans:', error);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -74,7 +153,7 @@ function SubscribeModal({ onClose, user }) {
   const handleWhatsApp = () => {
     if (!selected) return;
     const msg = makeWhatsAppMsg(user, selected);
-    window.open(`https://wa.me/${YOUR_WHATSAPP}?text=${msg}`, '_blank');
+    openWhatsApp(YOUR_WHATSAPP, msg, isMobile);
   };
 
   return (
