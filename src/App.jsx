@@ -9,7 +9,7 @@ import Customers from './Customers';
 import Subscriptions from './Subscriptions';
 import Payments from './Payments';
 import Plans from './Plans';
-import Settings from './Settings';
+import Settings from './Settings'; 
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
