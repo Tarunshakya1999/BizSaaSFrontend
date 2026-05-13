@@ -3,7 +3,7 @@ import { getSaaSPlans } from './api';
 import { X, Crown, QrCode, MessageCircle, Clock, AlertTriangle, Shield } from 'lucide-react';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const YOUR_WHATSAPP = '9971866919';
+const YOUR_WHATSAPP = '919971866919';
 const YOUR_UPI_ID = 'shakyatarun32-3@okicici';
 const YOUR_NAME = 'BizTrack Support';
 
