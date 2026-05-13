@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = 'http://https://bizsaasbackend.onrender.com/api';
+const BASE_URL = 'https://bizsaasbackend.onrender.com/api';
 
 const api = axios.create({ baseURL: BASE_URL });
 
