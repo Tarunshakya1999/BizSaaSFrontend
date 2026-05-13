@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useBusiness } from './BusinessContext';
+import { useBusiness } from './Businesscontext';
 import { getPayments, createPayment, markPaid, getSubscriptions } from './api';
 import { Plus, X, CheckCircle, Clock, IndianRupee } from 'lucide-react';
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useBusiness } from './BusinessContext';
-import { useAuth } from './AuthContext';
+import { useBusiness } from './Businesscontext';
+import { useAuth } from './Authcontext';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from './api';
 import { Plus, Search, Edit2, Trash2, Phone, User, X, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
 

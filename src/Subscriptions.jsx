@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useBusiness } from './BusinessContext';
+import { useBusiness } from './Businesscontext';
 import {
   getSubscriptions, createSubscription, updateSubscription,
   deleteSubscription, getCustomers, getPlans

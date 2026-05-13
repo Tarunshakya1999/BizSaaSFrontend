@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from './AuthContext';
-import { useBusiness } from './BusinessContext';
+import { useAuth } from './Authcontext';
+import { useBusiness } from './Businesscontext';
 import { TrialBanner } from './SaasBanner';
 import {
   LayoutDashboard, Users, CreditCard, CalendarCheck,

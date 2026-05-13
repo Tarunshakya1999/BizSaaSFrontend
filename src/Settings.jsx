@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBusiness } from './Businesscontext';
-import { createBusiness, updateBusiness, deleteBusiness } from './Api';
+import { createBusiness, updateBusiness, deleteBusiness } from './api';
 import { Plus, Edit2, Trash2, Building2, X, QrCode } from 'lucide-react';
 
 function Modal({ title, onClose, children }) {

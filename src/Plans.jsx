@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useBusiness } from './BusinessContext';
+import { useBusiness } from './Businesscontext';
 import { getPlans, createPlan, updatePlan, deletePlan } from './api';
 import { Plus, X, Edit2, Trash2, Tag } from 'lucide-react';
 

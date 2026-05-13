@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useBusiness } from './BusinessContext';
+import { useBusiness } from './Businesscontext';
 import { getDashboard, getExpiringSoon } from './api';
 import { Users, CalendarCheck, CreditCard, AlertTriangle, TrendingUp, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
