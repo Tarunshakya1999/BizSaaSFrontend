@@ -93,7 +93,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Subscription */}
       {!isEdit && (
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1.5">Subscription *</label>
@@ -111,7 +110,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         </div>
       )}
 
-      {/* Total Amount */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Total Amount (₹) *</label>
         <input
@@ -124,7 +122,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         />
       </div>
 
-      {/* Received Amount */}
       {form.amount && !isEdit && (
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1.5">
@@ -158,7 +155,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         </div>
       )}
 
-      {/* Status (edit mode only) */}
       {isEdit && (
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1.5">Payment Status</label>
@@ -174,7 +170,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         </div>
       )}
 
-      {/* Due Date */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Due Date *</label>
         <input
@@ -186,7 +181,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         />
       </div>
 
-      {/* Payment Method */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Payment Method</label>
         <select
@@ -200,7 +194,6 @@ function PaymentForm({ onSave, onClose, businessId, initial }) {
         </select>
       </div>
 
-      {/* Notes */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Notes</label>
         <input
@@ -232,10 +225,12 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
   const [method, setMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
 
+  // Supports both old Hindi format (Baaki:) and new English format (Remaining:)
   const getAlreadyReceived = () => {
     if (!payment.notes) return 0;
     const match = payment.notes.match(/Received: ₹([\d.]+)/);
-    return match ? parseFloat(match[1]) : 0;
+    if (match) return parseFloat(match[1]);
+    return 0;
   };
 
   const alreadyReceived = getAlreadyReceived();
@@ -253,12 +248,15 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
         ? `Full payment received | Total: ₹${totalAmount}`
         : `Received: ₹${newTotal} | Remaining: ₹${stillPending}`;
 
-      await api.patch(`/payments/${payment.id}/`, {
-        status: newStatus,
-        method: method,
-        notes: newNotes,
-        ...(isFullyPaid && { payment_date: new Date().toISOString().split('T')[0] }),
-      });
+      if (isFullyPaid) {
+        await markPaid(payment.id, method);
+      } else {
+        await api.patch(`/payments/${payment.id}/`, {
+          status: newStatus,
+          method: method,
+          notes: newNotes,
+        });
+      }
       onSave();
     } finally {
       setLoading(false);
@@ -267,7 +265,6 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Summary */}
       <div className="bg-gray-800 rounded-xl p-4 space-y-2 text-sm">
         <div className="flex justify-between text-gray-400">
           <span>Total Amount:</span>
@@ -283,7 +280,6 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
         </div>
       </div>
 
-      {/* Additional Amount */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Amount Received Now (₹) *</label>
         <input
@@ -297,7 +293,6 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
         />
       </div>
 
-      {/* Preview */}
       {additionalAmount && (
         <div className={`px-3 py-2 rounded-xl text-xs font-medium ${
           isFullyPaid
@@ -310,7 +305,6 @@ function PartialUpdateModal({ payment, onSave, onClose }) {
         </div>
       )}
 
-      {/* Method */}
       <div>
         <label className="block text-sm font-medium text-gray-400 mb-1.5">Payment Method</label>
         <select value={method} onChange={(e) => setMethod(e.target.value)}
@@ -340,6 +334,41 @@ const STATUS_STYLES = {
   paid:    'text-green-400 bg-green-950/50 border border-green-800/30',
   unpaid:  'text-red-400 bg-red-950/50 border border-red-800/30',
   partial: 'text-yellow-400 bg-yellow-950/50 border border-yellow-800/30',
+};
+
+// ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
+
+// Supports both formats: "Received: ₹500" and fallback calculation
+const getReceivedAmount = (p) => {
+  if (p.status === 'paid') return parseFloat(p.amount);
+  if (p.status === 'partial') {
+    // Try English format first
+    const matchEn = p.notes?.match(/Received: ₹([\d.]+)/);
+    if (matchEn) return parseFloat(matchEn[1]);
+    // Fallback: 0 received
+    return 0;
+  }
+  return 0;
+};
+
+// Supports both formats: "Remaining: ₹1800" and old "Baaki: ₹1800"
+// If neither matches, calculate from total - received
+const getRemainingAmount = (p) => {
+  if (p.status === 'unpaid') return parseFloat(p.amount);
+  if (p.status === 'partial') {
+    // Try new English format
+    const matchEn = p.notes?.match(/Remaining: ₹([\d.]+)/);
+    if (matchEn) return parseFloat(matchEn[1]);
+
+    // Try old Hindi format
+    const matchHi = p.notes?.match(/Baaki: ₹([\d.]+)/);
+    if (matchHi) return parseFloat(matchHi[1]);
+
+    // Last fallback: calculate directly
+    const received = getReceivedAmount(p);
+    return Math.max(0, parseFloat(p.amount) - received);
+  }
+  return 0;
 };
 
 // ─── MAIN PAYMENTS PAGE ───────────────────────────────────────────────────────
@@ -376,41 +405,15 @@ export default function Payments() {
   // ─── Summary ───────────────────────────────────────────────────────────────
   const totalCollected = payments.reduce((s, p) => {
     if (p.status === 'paid') return s + parseFloat(p.amount);
-    if (p.status === 'partial') {
-      const match = p.notes?.match(/Received: ₹([\d.]+)/);
-      return s + (match ? parseFloat(match[1]) : 0);
-    }
+    if (p.status === 'partial') return s + getReceivedAmount(p);
     return s;
   }, 0);
 
   const totalPending = payments.reduce((s, p) =>
     s + (p.status === 'unpaid' ? parseFloat(p.amount) : 0), 0);
 
-  const totalPartialPending = payments.reduce((s, p) => {
-    if (p.status === 'partial') {
-      const match = p.notes?.match(/Remaining: ₹([\d.]+)/);
-      return s + (match ? parseFloat(match[1]) : 0);
-    }
-    return s;
-  }, 0);
-
-  const getReceivedAmount = (p) => {
-    if (p.status === 'paid') return parseFloat(p.amount);
-    if (p.status === 'partial') {
-      const match = p.notes?.match(/Received: ₹([\d.]+)/);
-      return match ? parseFloat(match[1]) : 0;
-    }
-    return 0;
-  };
-
-  const getRemainingAmount = (p) => {
-    if (p.status === 'partial') {
-      const match = p.notes?.match(/Remaining: ₹([\d.]+)/);
-      return match ? parseFloat(match[1]) : 0;
-    }
-    if (p.status === 'unpaid') return parseFloat(p.amount);
-    return 0;
-  };
+  const totalPartialPending = payments.reduce((s, p) =>
+    p.status === 'partial' ? s + getRemainingAmount(p) : s, 0);
 
   const partialCount = payments.filter(p => p.status === 'partial').length;
 
@@ -482,7 +485,7 @@ export default function Payments() {
             const received = getReceivedAmount(p);
             const remaining = getRemainingAmount(p);
             const total = parseFloat(p.amount);
-            const progressPct = total > 0 ? (received / total) * 100 : 0;
+            const progressPct = total > 0 ? Math.min((received / total) * 100, 100) : 0;
 
             return (
               <div key={p.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-3">
@@ -505,33 +508,25 @@ export default function Payments() {
                     )}
                   </div>
 
-                  {/* Amount + Edit/Delete */}
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <p className="text-white font-bold">₹{total.toLocaleString('en-IN')}</p>
                     {p.status === 'partial' && (
                       <p className="text-yellow-400 text-xs">₹{received.toLocaleString('en-IN')} received</p>
                     )}
-                    {/* Edit + Delete buttons */}
                     <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setEditModal(p)}
-                        className="p-1.5 text-gray-500 hover:text-indigo-400 bg-gray-800 rounded-lg transition"
-                        title="Edit"
-                      >
+                      <button onClick={() => setEditModal(p)}
+                        className="p-1.5 text-gray-500 hover:text-indigo-400 bg-gray-800 rounded-lg transition">
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="p-1.5 text-gray-500 hover:text-red-400 bg-gray-800 rounded-lg transition"
-                        title="Delete"
-                      >
+                      <button onClick={() => handleDelete(p.id)}
+                        className="p-1.5 text-gray-500 hover:text-red-400 bg-gray-800 rounded-lg transition">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Partial progress bar */}
+                {/* Partial progress bar — sirf tab dikhao jab partial ho */}
                 {p.status === 'partial' && (
                   <div className="space-y-1.5">
                     <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
@@ -541,8 +536,19 @@ export default function Payments() {
                       />
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className="text-yellow-400">₹{received.toLocaleString('en-IN')} received</span>
-                      <span className="text-red-400">₹{remaining.toLocaleString('en-IN')} remaining</span>
+                      <span className="text-yellow-400">
+                        ₹{received.toLocaleString('en-IN')} received
+                      </span>
+                      {/* Remaining: sirf tab dikhao jab > 0 ho */}
+                      {remaining > 0 ? (
+                        <span className="text-red-400">
+                          ₹{remaining.toLocaleString('en-IN')} remaining
+                        </span>
+                      ) : (
+                        <span className="text-green-400">
+                          Fully received ✓
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -551,32 +557,24 @@ export default function Payments() {
                 <div className="flex gap-2">
                   {p.status === 'unpaid' && (
                     <>
-                      <button
-                        onClick={() => handleMarkPaid(p.id)}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition"
-                      >
+                      <button onClick={() => handleMarkPaid(p.id)}
+                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition">
                         <CheckCircle className="w-3 h-3" /> Mark Full Paid
                       </button>
-                      <button
-                        onClick={() => setPartialModal(p)}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg transition"
-                      >
+                      <button onClick={() => setPartialModal(p)}
+                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg transition">
                         <AlertCircle className="w-3 h-3" /> Partial Received
                       </button>
                     </>
                   )}
                   {p.status === 'partial' && (
                     <>
-                      <button
-                        onClick={() => setPartialModal(p)}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg transition"
-                      >
+                      <button onClick={() => setPartialModal(p)}
+                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-2 rounded-lg transition">
                         <AlertCircle className="w-3 h-3" /> Add More Payment
                       </button>
-                      <button
-                        onClick={() => handleMarkPaid(p.id)}
-                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition"
-                      >
+                      <button onClick={() => handleMarkPaid(p.id)}
+                        className="flex-1 flex items-center justify-center gap-1 text-xs bg-green-700 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition">
                         <CheckCircle className="w-3 h-3" /> Mark Full Paid
                       </button>
                     </>
@@ -588,7 +586,6 @@ export default function Payments() {
         </div>
       )}
 
-      {/* Add Payment Modal */}
       {modal && (
         <Modal title="Add Payment" onClose={() => setModal(false)}>
           <PaymentForm
@@ -599,7 +596,6 @@ export default function Payments() {
         </Modal>
       )}
 
-      {/* Edit Payment Modal */}
       {editModal && (
         <Modal title="Edit Payment" onClose={() => setEditModal(null)}>
           <PaymentForm
@@ -611,7 +607,6 @@ export default function Payments() {
         </Modal>
       )}
 
-      {/* Partial Update Modal */}
       {partialModal && (
         <Modal title="Update Partial Payment" onClose={() => setPartialModal(null)}>
           <PartialUpdateModal
